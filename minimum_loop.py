@@ -1,5 +1,6 @@
 from sentence_transformers import SentenceTransformer
 import chromadb
+from chunk import load_docs, split_chunks
 
 import pprint
 

@@ -1,4 +1,5 @@
 import os
+import re
 
 import chromadb
 from anthropic import AnthropicFoundry
@@ -51,6 +52,54 @@ def retrieve(collection, question, k=3):
     ]
 
 
+STOPWORDS = {
+    "a", "an", "and", "are", "can", "do", "does", "for", "how", "i", "in", "is", "it",
+    "many", "much", "my", "of", "on", "or", "the", "to", "what", "when", "where",
+    "which", "who", "why", "with",
+}
+
+
+def tokenize(text):
+    """Lowercase words minus stopwords, keeping hyphenated codes like 'hr-201' as one token."""
+    return set(re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", text.lower())) - STOPWORDS
+
+
+def keyword_search(collection, query, k=3):
+    """Rank chunks by the query terms they contain, rare terms counting more."""
+    stored = collection.get()
+    chunk_tokens = [tokenize(text) for text in stored["documents"]]
+    terms = tokenize(query)
+    doc_freq = {t: sum(t in tokens for tokens in chunk_tokens) for t in terms}
+
+    scored = []
+    for chunk_id, text, metadata, tokens in zip(
+        stored["ids"], stored["documents"], stored["metadatas"], chunk_tokens
+    ):
+        score = sum(1 / doc_freq[t] for t in terms if t in tokens)
+        if score > 0:
+            scored.append((score, {"id": chunk_id, "text": text, "metadata": metadata}))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [hit for _, hit in scored[:k]]
+
+
+RRF_K = 60  # standard Reciprocal Rank Fusion constant; damps the gap between top ranks
+CANDIDATES = 10  # how many hits each search contributes before merging
+
+
+def hybrid_retrieve(collection, question, k=3):
+    """Merge vector and keyword results with Reciprocal Rank Fusion, best first."""
+    pool = min(CANDIDATES, collection.count())
+    scores, hits_by_id = {}, {}
+    for results in (retrieve(collection, question, k=pool), keyword_search(collection, question, k=pool)):
+        for rank, hit in enumerate(results, start=1):
+            scores[hit["id"]] = scores.get(hit["id"], 0) + 1 / (RRF_K + rank)
+            hits_by_id[hit["id"]] = hit
+
+    ranked = sorted(scores, key=scores.get, reverse=True)
+    return [hits_by_id[chunk_id] for chunk_id in ranked[:k]]
+
+
 def build_prompt(question, hits, show_sources=True):
     if show_sources:
         context = "\n\n".join(
@@ -63,7 +112,7 @@ def build_prompt(question, hits, show_sources=True):
 
 def answer(question, collection, llm, k=3, show_sources=True):
     """Retrieve context, ask llm (a prompt -> str callable), and report sources."""
-    hits = retrieve(collection, question, k=k)
+    hits = hybrid_retrieve(collection, question, k=k)
     sources = list(dict.fromkeys(hit["metadata"]["source"] for hit in hits))
     prompt = build_prompt(question, hits, show_sources=show_sources)
     return {"answer": llm(prompt), "sources": sources}

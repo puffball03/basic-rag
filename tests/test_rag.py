@@ -143,3 +143,33 @@ def test_answer_with_hidden_sources_still_reports_them(tiny_collection):
     assert "[pets]" not in llm.prompts[0]
     assert "dogs to the office on Fridays" in llm.prompts[0]
     assert result["sources"] == ["pets"]
+
+
+# ---------- keyword search (Part 3) ----------
+
+def test_keyword_search_ranks_exact_code_first(policy_collection):
+    hits = rag.keyword_search(policy_collection, "What is HR-201?", k=3)
+    assert hits[0]["id"] == "pto_policy::0"
+
+
+def test_keyword_search_no_matches_returns_empty(tiny_collection):
+    assert rag.keyword_search(tiny_collection, "quantum xylophone", k=3) == []
+
+
+# ---------- hybrid retrieval (Part 3) ----------
+
+def test_hybrid_retrieve_returns_k_unique_hits(policy_collection):
+    # "Sick Leave" is found by both searches, so the merge must de-duplicate
+    hits = rag.hybrid_retrieve(policy_collection, "Sick Leave", k=3)
+    ids = [h["id"] for h in hits]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3
+
+
+def test_hybrid_finds_policy_code_that_vector_search_misses(policy_collection):
+    # Deliverable 5: embeddings don't know what "HR-201" means; keyword match does
+    question = "What is HR-201?"
+    vector_ids = [h["id"] for h in rag.retrieve(policy_collection, question, k=3)]
+    hybrid_ids = [h["id"] for h in rag.hybrid_retrieve(policy_collection, question, k=3)]
+    assert "pto_policy::0" not in vector_ids
+    assert "pto_policy::0" in hybrid_ids

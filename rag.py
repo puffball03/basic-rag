@@ -95,6 +95,9 @@ def make_foundry_llm():
 
 if __name__ == "__main__":
     collection = build_index(split_chunks(load_docs("./policies/")), "Arasaka_docs")
-    result = answer("How many sick days do employees get?", collection, llm=make_foundry_llm())
+    query = "How many sick days do employees get?"
+    result = answer(query, collection, llm=make_foundry_llm())
+    print("---------------TEST QUERY---------------")
+    print(f"Query: {query}")
     print(result["answer"])
     print("Sources:", ", ".join(result["sources"]))

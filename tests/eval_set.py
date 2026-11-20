@@ -1,13 +1,3 @@
-"""Fixed evaluation set for Part 5 of rag-guideines.pdf.
-
-Each case says where the answer lives and what a correct answer must mention:
-  expected_source   document stem the answer comes from
-  expected_section  chunk "section" metadata ("" = the document header, before the first ## heading)
-  expected_facts    list of fact groups; an answer passes if, for every group, it contains
-                    at least one of the alternatives (case-insensitive), e.g. [["10", "ten"]]
-  note              optional: why the case is in the set
-"""
-
 EVAL_SET = [
     # ---------- PTO policy (HR-201) ----------
     {

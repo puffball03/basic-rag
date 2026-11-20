@@ -83,4 +83,11 @@ EVAL_SET = [
         "expected_facts": [["discontinued", "no longer"]],
         "note": "Planted data-quality issue (Part 6): outdated v2 offers a $500 stipend.",
     },
+    {
+        "question": "How long can a temporary increase in my remote days be approved for?",
+        "expected_source": "remote_work_policy_v3",
+        "expected_section": "2. Return to Office",
+        "expected_facts": [["five", "5"], ["sick"]],
+        "note": "Planted data-quality issue (Part 6): only outdated v2 answers this (4 weeks). See DIAGNOSIS.md.",
+    },
 ]

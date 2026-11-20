@@ -119,10 +119,15 @@ def build_prompt(question, hits, show_sources=True):
     return PROMPT_TEMPLATE.format(context=context, question=question)
 
 
+def retrieve_context(question, collection, k=3):
+    """The chunks sent to the LLM: wide hybrid retrieval, narrowed by the reranker."""
+    candidates = hybrid_retrieve(collection, question, k=CANDIDATES)
+    return rerank(question, candidates, top_n=k)
+
+
 def answer(question, collection, llm, k=3, show_sources=True):
     """Retrieve context, ask llm (a prompt -> str callable), and report sources."""
-    candidates = hybrid_retrieve(collection, question, k=CANDIDATES)
-    hits = rerank(question, candidates, top_n=k)
+    hits = retrieve_context(question, collection, k=k)
     sources = list(dict.fromkeys(hit["metadata"]["source"] for hit in hits))
     prompt = build_prompt(question, hits, show_sources=show_sources)
     return {"answer": llm(prompt), "sources": sources}

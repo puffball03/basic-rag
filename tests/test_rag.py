@@ -195,3 +195,11 @@ def test_rerank_fixes_wrong_input_order(tiny_chunks):
 def test_rerank_with_fewer_hits_than_top_n_returns_all(tiny_chunks):
     hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
     assert len(rag.rerank("parking", hits, top_n=5)) == 2
+
+
+# ---------- final context sent to the LLM ----------
+
+def test_retrieve_context_returns_k_reranked_hits(policy_collection):
+    hits = rag.retrieve_context("How many sick days do employees get?", policy_collection, k=3)
+    assert len(hits) == 3
+    assert all("score" in h for h in hits)

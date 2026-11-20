@@ -1,8 +1,3 @@
-"""Minimal embed-store-retrieve loop (Suggested Approach steps 2-3 in rag-guideines.pdf).
-
-Step 2: embed one short text with sentence-transformers and store it in chromadb.
-Step 3: add a second, different text, run a query, and confirm the more relevant one comes back first.
-"""
 import chromadb
 from sentence_transformers import SentenceTransformer
 

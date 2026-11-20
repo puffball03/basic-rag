@@ -143,3 +143,55 @@ def test_answer_with_hidden_sources_still_reports_them(tiny_collection):
     assert "[pets]" not in llm.prompts[0]
     assert "dogs to the office on Fridays" in llm.prompts[0]
     assert result["sources"] == ["pets"]
+
+
+# ---------- keyword search (Part 3) ----------
+
+def test_keyword_search_ranks_exact_code_first(policy_collection):
+    hits = rag.keyword_search(policy_collection, "What is HR-201?", k=3)
+    assert hits[0]["id"] == "pto_policy::0"
+
+
+def test_keyword_search_no_matches_returns_empty(tiny_collection):
+    assert rag.keyword_search(tiny_collection, "quantum xylophone", k=3) == []
+
+
+# ---------- hybrid retrieval (Part 3) ----------
+
+def test_hybrid_retrieve_returns_k_unique_hits(policy_collection):
+    # "Sick Leave" is found by both searches, so the merge must de-duplicate
+    hits = rag.hybrid_retrieve(policy_collection, "Sick Leave", k=3)
+    ids = [h["id"] for h in hits]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3
+
+
+def test_hybrid_finds_policy_code_that_vector_search_misses(policy_collection):
+    # Deliverable 5: embeddings don't know what "HR-201" means; keyword match does
+    question = "What is HR-201?"
+    vector_ids = [h["id"] for h in rag.retrieve(policy_collection, question, k=3)]
+    hybrid_ids = [h["id"] for h in rag.hybrid_retrieve(policy_collection, question, k=3)]
+    assert "pto_policy::0" not in vector_ids
+    assert "pto_policy::0" in hybrid_ids
+
+
+# ---------- reranking (Part 4) ----------
+
+def test_rerank_returns_top_n_sorted_by_score(policy_collection):
+    candidates = rag.hybrid_retrieve(policy_collection, "How many sick days do employees get?", k=10)
+    reranked = rag.rerank("How many sick days do employees get?", candidates, top_n=3)
+    scores = [h["score"] for h in reranked]
+    assert len(reranked) == 3
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_rerank_fixes_wrong_input_order(tiny_chunks):
+    hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
+    hits.reverse()  # parking first: the wrong order for this question
+    reranked = rag.rerank("Can I bring my dog to work?", hits, top_n=2)
+    assert reranked[0]["id"] == "pets::0"
+
+
+def test_rerank_with_fewer_hits_than_top_n_returns_all(tiny_chunks):
+    hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
+    assert len(rag.rerank("parking", hits, top_n=5)) == 2

@@ -51,18 +51,22 @@ def retrieve(collection, question, k=3):
     ]
 
 
-def build_prompt(question, hits):
-    context = "\n\n".join(
-        f"[{hit['metadata'].get('source', '?')}] {hit['text']}" for hit in hits
-    )
+def build_prompt(question, hits, show_sources=True):
+    if show_sources:
+        context = "\n\n".join(
+            f"[{hit['metadata'].get('source', '?')}] {hit['text']}" for hit in hits
+        )
+    else:
+        context = "\n\n".join(hit["text"] for hit in hits)
     return PROMPT_TEMPLATE.format(context=context, question=question)
 
 
-def answer(question, collection, llm, k=3):
+def answer(question, collection, llm, k=3, show_sources=True):
     """Retrieve context, ask llm (a prompt -> str callable), and report sources."""
     hits = retrieve(collection, question, k=k)
     sources = list(dict.fromkeys(hit["metadata"]["source"] for hit in hits))
-    return {"answer": llm(build_prompt(question, hits)), "sources": sources}
+    prompt = build_prompt(question, hits, show_sources=show_sources)
+    return {"answer": llm(prompt), "sources": sources}
 
 
 def make_foundry_llm():

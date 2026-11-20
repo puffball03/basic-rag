@@ -134,3 +134,12 @@ def test_answer_sends_retrieved_context_to_llm(tiny_collection):
 def test_answer_reports_sources(tiny_collection):
     result = rag.answer("Can I bring my dog?", tiny_collection, llm=FakeLLM(), k=1)
     assert result["sources"] == ["pets"]
+
+
+def test_answer_with_hidden_sources_still_reports_them(tiny_collection):
+    # Part 6: the LLM is blind to sources, but we still know where its context came from
+    llm = FakeLLM()
+    result = rag.answer("Can I bring my dog?", tiny_collection, llm=llm, k=1, show_sources=False)
+    assert "[pets]" not in llm.prompts[0]
+    assert "dogs to the office on Fridays" in llm.prompts[0]
+    assert result["sources"] == ["pets"]

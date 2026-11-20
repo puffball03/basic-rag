@@ -1,6 +1,6 @@
 from sentence_transformers import SentenceTransformer
 import chromadb
-from chunk import load_docs, split_chunks
+from chunker import load_docs, split_chunks
 
 import pprint
 
@@ -22,7 +22,7 @@ metadatas = [chunk.metadata for chunk in chunks]
 embeddings = model.encode(texts, normalize_embeddings=True)
 
 collection.add(
-    ids=[str(i) for i in range(len(chunks))],
+    ids=[chunk.metadata["id"] for chunk in chunks],
     documents = texts,
     metadatas=metadatas,
     embeddings=embeddings,

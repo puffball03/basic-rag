@@ -222,3 +222,20 @@ def test_retrieve_context_skips_superseded_documents(policy_collection):
 def test_retrieve_context_can_include_superseded_documents(policy_collection):
     hits = rag.retrieve_context(V2_ONLY_QUESTION, policy_collection, k=3, include_superseded=True)
     assert "remote_work_policy_v2::8" in [h["id"] for h in hits]
+
+
+# ---------- source attribution (Part 7) ----------
+
+def test_answer_sources_include_section(policy_collection):
+    result = rag.answer("How many sick days do employees get?", policy_collection, llm=FakeLLM())
+    assert "pto_policy § 5. Sick Leave" in result["sources"]
+
+
+def test_build_prompt_labels_include_section():
+    hit = {
+        "id": "pto_policy::5",
+        "text": "Full-time employees receive ten days of sick leave.",
+        "metadata": {"source": "pto_policy", "section": "5. Sick Leave"},
+    }
+    prompt = rag.build_prompt("How many sick days?", [hit])
+    assert "[pto_policy § 5. Sick Leave]" in prompt

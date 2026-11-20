@@ -4,11 +4,12 @@ import re
 import chromadb
 from anthropic import AnthropicFoundry
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder, SentenceTransformer
 
 from chunker import load_docs, split_chunks
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 client = chromadb.Client()
 
 SYSTEM_PROMPT = """You answer questions about Arasaka company policy.
@@ -100,6 +101,14 @@ def hybrid_retrieve(collection, question, k=3):
     return [hits_by_id[chunk_id] for chunk_id in ranked[:k]]
 
 
+def rerank(question, hits, top_n=3):
+    """Re-score hits with a cross-encoder (question and chunk read together); keep the best top_n."""
+    scores = reranker.predict([(question, hit["text"]) for hit in hits])
+    scored = [{**hit, "score": float(score)} for hit, score in zip(hits, scores)]
+    scored.sort(key=lambda hit: hit["score"], reverse=True)
+    return scored[:top_n]
+
+
 def build_prompt(question, hits, show_sources=True):
     if show_sources:
         context = "\n\n".join(
@@ -112,7 +121,8 @@ def build_prompt(question, hits, show_sources=True):
 
 def answer(question, collection, llm, k=3, show_sources=True):
     """Retrieve context, ask llm (a prompt -> str callable), and report sources."""
-    hits = hybrid_retrieve(collection, question, k=k)
+    candidates = hybrid_retrieve(collection, question, k=CANDIDATES)
+    hits = rerank(question, candidates, top_n=k)
     sources = list(dict.fromkeys(hit["metadata"]["source"] for hit in hits))
     prompt = build_prompt(question, hits, show_sources=show_sources)
     return {"answer": llm(prompt), "sources": sources}

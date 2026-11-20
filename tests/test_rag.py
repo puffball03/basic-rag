@@ -173,3 +173,25 @@ def test_hybrid_finds_policy_code_that_vector_search_misses(policy_collection):
     hybrid_ids = [h["id"] for h in rag.hybrid_retrieve(policy_collection, question, k=3)]
     assert "pto_policy::0" not in vector_ids
     assert "pto_policy::0" in hybrid_ids
+
+
+# ---------- reranking (Part 4) ----------
+
+def test_rerank_returns_top_n_sorted_by_score(policy_collection):
+    candidates = rag.hybrid_retrieve(policy_collection, "How many sick days do employees get?", k=10)
+    reranked = rag.rerank("How many sick days do employees get?", candidates, top_n=3)
+    scores = [h["score"] for h in reranked]
+    assert len(reranked) == 3
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_rerank_fixes_wrong_input_order(tiny_chunks):
+    hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
+    hits.reverse()  # parking first: the wrong order for this question
+    reranked = rag.rerank("Can I bring my dog to work?", hits, top_n=2)
+    assert reranked[0]["id"] == "pets::0"
+
+
+def test_rerank_with_fewer_hits_than_top_n_returns_all(tiny_chunks):
+    hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
+    assert len(rag.rerank("parking", hits, top_n=5)) == 2

@@ -181,3 +181,6 @@ cython_debug/
 .cursorindexingignore
 # Local planning notes
 IMPLEMENTATION_PLAN.md
+
+# macOS
+.DS_Store

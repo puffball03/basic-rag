@@ -1,6 +1,8 @@
-import pprint
+import os
 
 import chromadb
+from anthropic import AnthropicFoundry
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
 from chunker import load_docs, split_chunks
@@ -8,14 +10,14 @@ from chunker import load_docs, split_chunks
 model = SentenceTransformer("all-MiniLM-L6-v2")
 client = chromadb.Client()
 
-PROMPT_TEMPLATE = """Answer the question using only the context below.
-If the context does not contain the answer, say you don't know.
+SYSTEM_PROMPT = """You answer questions about Arasaka company policy.
+Use only the context provided in the user's message.
+If the context does not contain the answer, say you don't know."""
 
-Context:
+PROMPT_TEMPLATE = """Context:
 {context}
 
-Question: {question}
-Answer:"""
+Question: {question}"""
 
 
 def embed(texts):
@@ -63,6 +65,32 @@ def answer(question, collection, llm, k=3):
     return {"answer": llm(build_prompt(question, hits)), "sources": sources}
 
 
+def make_foundry_llm():
+    """Return a prompt -> str callable backed by a Claude deployment on Microsoft Foundry."""
+    load_dotenv()
+    llm_client = AnthropicFoundry(
+        api_key=os.environ["FOUNDRY_API_KEY"],
+        base_url=os.environ["FOUNDRY_ENDPOINT"],
+    )
+    deployment = os.environ["FOUNDRY_DEPLOYMENT"]
+
+    def llm(prompt):
+        message = llm_client.messages.create(
+            model=deployment,
+            max_tokens=16000,
+            system=SYSTEM_PROMPT,
+            output_config={"effort": "low"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        if message.stop_reason == "refusal":
+            return "The model declined to answer this question."
+        return "".join(block.text for block in message.content if block.type == "text")
+
+    return llm
+
+
 if __name__ == "__main__":
     collection = build_index(split_chunks(load_docs("./policies/")), "Arasaka_docs")
-    pprint.pprint(retrieve(collection, "What is the PTO policy?"))
+    result = answer("How many sick days do employees get?", collection, llm=make_foundry_llm())
+    print(result["answer"])
+    print("Sources:", ", ".join(result["sources"]))

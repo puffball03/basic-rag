@@ -148,3 +148,20 @@ def test_split_chunks_is_deterministic(policy_docs):
     a = [(c.page_content, c.metadata) for c in split_chunks(policy_docs)]
     b = [(c.page_content, c.metadata) for c in split_chunks(policy_docs)]
     assert a == b
+
+# ---------- lineage: superseded documents (Part 6 fix) ----------
+
+def test_superseded_document_chunks_are_marked(policy_chunks):
+    # v3's header says "Supersedes: HR-104 Version 2.0"
+    status = {c.metadata["source"]: c.metadata["status"] for c in policy_chunks}
+    assert status["remote_work_policy_v2"] == "superseded"
+    assert status["remote_work_policy_v3"] == "current"
+    assert status["pto_policy"] == "current"
+
+
+def test_documents_are_current_when_nothing_supersedes_them():
+    files = {
+        "old": "# Policy\n\n**Policy Number:** X-1\n**Version:** 1.0\n\n## 1. Body\nOld text.",
+        "new": "# Policy\n\n**Policy Number:** X-1\n**Version:** 2.0\n\n## 1. Body\nNew text.",
+    }
+    assert {c.metadata["status"] for c in split_chunks(files)} == {"current"}

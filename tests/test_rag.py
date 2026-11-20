@@ -167,10 +167,14 @@ def test_hybrid_retrieve_returns_k_unique_hits(policy_collection):
 
 
 def test_hybrid_finds_policy_code_that_vector_search_misses(policy_collection):
-    # Deliverable 5: embeddings don't know what "HR-201" means; keyword match does
+    # Deliverable 5: embeddings don't know what "HR-201" means; keyword match does.
+    # Compared on the full corpus (superseded v2 included), as in the Deliverable 5 screenshots:
+    # v2's look-alike header chunks are what push the PTO header out of vector search's top 3.
     question = "What is HR-201?"
-    vector_ids = [h["id"] for h in rag.retrieve(policy_collection, question, k=3)]
-    hybrid_ids = [h["id"] for h in rag.hybrid_retrieve(policy_collection, question, k=3)]
+    vector_ids = [h["id"] for h in rag.retrieve(policy_collection, question, k=3, include_superseded=True)]
+    hybrid_ids = [
+        h["id"] for h in rag.hybrid_retrieve(policy_collection, question, k=3, include_superseded=True)
+    ]
     assert "pto_policy::0" not in vector_ids
     assert "pto_policy::0" in hybrid_ids
 
@@ -203,3 +207,18 @@ def test_retrieve_context_returns_k_reranked_hits(policy_collection):
     hits = rag.retrieve_context("How many sick days do employees get?", policy_collection, k=3)
     assert len(hits) == 3
     assert all("score" in h for h in hits)
+
+
+# ---------- superseded documents (Part 6 fix) ----------
+
+V2_ONLY_QUESTION = "How long can a temporary increase in my remote days be approved for?"
+
+
+def test_retrieve_context_skips_superseded_documents(policy_collection):
+    hits = rag.retrieve_context(V2_ONLY_QUESTION, policy_collection, k=3)
+    assert all(h["metadata"]["status"] == "current" for h in hits)
+
+
+def test_retrieve_context_can_include_superseded_documents(policy_collection):
+    hits = rag.retrieve_context(V2_ONLY_QUESTION, policy_collection, k=3, include_superseded=True)
+    assert "remote_work_policy_v2::8" in [h["id"] for h in hits]

@@ -18,6 +18,8 @@ def show(label, hits):
     print(f"  found {EXPECTED}: {'YES' if found else 'NO'}")
 
 
+# Both searches see the full corpus, superseded remote_work_policy_v2 included, so the
+# comparison matches the original Deliverable 5 run (before the Part 6 lineage fix).
 print(f"Query: {QUESTION!r}")
-show("Vector-only", retrieve(collection, QUESTION, k=K))
-show("Hybrid (vector + keyword, RRF)", hybrid_retrieve(collection, QUESTION, k=K))
+show("Vector-only", retrieve(collection, QUESTION, k=K, include_superseded=True))
+show("Hybrid (vector + keyword, RRF)", hybrid_retrieve(collection, QUESTION, k=K, include_superseded=True))

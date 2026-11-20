@@ -109,6 +109,14 @@ def test_build_prompt_contains_question_and_context(tiny_chunks):
         assert c.page_content in prompt
 
 
+def test_build_prompt_can_hide_source_labels(tiny_chunks):
+    hits = [{"id": c.metadata["id"], "text": c.page_content, "metadata": c.metadata} for c in tiny_chunks]
+    prompt = rag.build_prompt("Can I bring my dog?", hits, show_sources=False)
+    assert "[pets]" not in prompt and "[parking]" not in prompt
+    for c in tiny_chunks:
+        assert c.page_content in prompt
+
+
 # ---------- answer (end to end, fake LLM) ----------
 
 def test_answer_returns_llm_output(tiny_collection):

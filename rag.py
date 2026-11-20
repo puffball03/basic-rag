@@ -14,7 +14,8 @@ client = chromadb.Client()
 
 SYSTEM_PROMPT = """You answer questions about Arasaka company policy.
 Use only the context provided in the user's message.
-If the context does not contain the answer, say you don't know."""
+If the context does not contain the answer, say you don't know.
+Each context passage starts with a [document § section] label; cite the label after each claim it supports."""
 
 CURRENT_ONLY = {"status": "current"}  # leave out chunks from superseded documents
 
@@ -118,10 +119,16 @@ def rerank(question, hits, top_n=3):
     return scored[:top_n]
 
 
+def source_label(metadata):
+    """'pto_policy § 5. Sick Leave', or just the document name when the chunk has no section."""
+    source, section = metadata.get("source", "?"), metadata.get("section", "")
+    return f"{source} § {section}" if section else source
+
+
 def build_prompt(question, hits, show_sources=True):
     if show_sources:
         context = "\n\n".join(
-            f"[{hit['metadata'].get('source', '?')}] {hit['text']}" for hit in hits
+            f"[{source_label(hit['metadata'])}] {hit['text']}" for hit in hits
         )
     else:
         context = "\n\n".join(hit["text"] for hit in hits)
@@ -137,7 +144,7 @@ def retrieve_context(question, collection, k=3, include_superseded=False):
 def answer(question, collection, llm, k=3, show_sources=True, include_superseded=False):
     """Retrieve context, ask llm (a prompt -> str callable), and report sources."""
     hits = retrieve_context(question, collection, k=k, include_superseded=include_superseded)
-    sources = list(dict.fromkeys(hit["metadata"]["source"] for hit in hits))
+    sources = list(dict.fromkeys(source_label(hit["metadata"]) for hit in hits))
     prompt = build_prompt(question, hits, show_sources=show_sources)
     return {"answer": llm(prompt), "sources": sources}
 
@@ -173,4 +180,6 @@ if __name__ == "__main__":
     print("---------------TEST QUERY---------------")
     print(f"Query: {query}")
     print(result["answer"])
-    print("Sources:", ", ".join(result["sources"]))
+    print("\nSources:")
+    for source in result["sources"]:
+        print(f"  - {source}")
